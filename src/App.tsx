@@ -1,12 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Settings } from 'lucide-react';
+import { Plus, Settings as SettingsIcon, Grid, List } from 'lucide-react';
 import { BookmarkTile } from './components/BookmarkTile';
 import { AddBookmarkModal } from './components/AddBookmarkModal';
 import { FolderModal } from './components/FolderModal';
+import { SettingsModal } from './components/SettingsModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { SearchBar } from './components/SearchBar';
+import { WeatherWidget } from './components/WeatherWidget';
+import { AnalogClock } from './components/AnalogClock';
+import { QuoteWidget } from './components/QuoteWidget';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { Bookmark, searchBookmarks, sortBookmarks, moveBookmark } from './utils/bookmarkUtils';
+import { searchBookmarks, sortBookmarks, moveBookmark } from './utils/bookmarkUtils';
+import { Bookmark, Settings } from './types';
+
+const defaultSettings: Settings = {
+  theme: 'dark',
+  backgroundType: 'gradient',
+  backgroundColor: 'from-blue-400 via-purple-500 to-pink-500',
+  tileSize: 'medium',
+  gridColumns: 4,
+  showClock: true,
+  showWeather: true,
+  showQuickLinks: true,
+  clockType: 'digital',
+  searchEngine: 'google',
+  viewMode: 'grid',
+};
 
 function App() {
   const [bookmarks, setBookmarks] = useLocalStorage<Bookmark[]>('bookmarks', [
@@ -74,9 +93,10 @@ function App() {
     },
   ]);
 
-  const [isDark, setIsDark] = useLocalStorage('darkMode', false);
+  const [settings, setSettings] = useLocalStorage<Settings>('settings', defaultSettings);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<Bookmark | null>(null);
@@ -86,21 +106,26 @@ function App() {
 
   // Update current time every minute
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Apply dark mode
+  // Apply theme
   useEffect(() => {
-    if (isDark) {
+    if (settings.theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [isDark]);
+  }, [settings.theme]);
 
   const filteredBookmarks = searchBookmarks(bookmarks, searchTerm);
-  const displayBookmarks = sortBookmarks(filteredBookmarks);
+  const sortedBookmarks = sortBookmarks(filteredBookmarks);
+  
+  // Separate pinned and regular bookmarks
+  const pinnedBookmarks = sortedBookmarks.filter(b => b.isPinned);
+  const regularBookmarks = sortedBookmarks.filter(b => !b.isPinned);
+  const displayBookmarks = [...pinnedBookmarks, ...regularBookmarks];
 
   const folders = bookmarks.filter(b => b.type === 'folder');
 
@@ -175,6 +200,22 @@ function App() {
     setBookmarks(toggleInArray(bookmarks));
   };
 
+  const handleTogglePin = (id: string) => {
+    const toggleInArray = (items: Bookmark[]): Bookmark[] => {
+      return items.map(item => {
+        if (item.id === id) {
+          return { ...item, isPinned: !item.isPinned };
+        }
+        if (item.type === 'folder' && item.items) {
+          return { ...item, items: toggleInArray(item.items) };
+        }
+        return item;
+      });
+    };
+    
+    setBookmarks(toggleInArray(bookmarks));
+  };
+
   const handleOpenFolder = (folder: Bookmark) => {
     setSelectedFolder(folder);
     setIsFolderModalOpen(true);
@@ -204,8 +245,46 @@ function App() {
     setDragOverId(null);
   };
 
+  const handleResetSettings = () => {
+    setSettings(defaultSettings);
+  };
+
+  const handleExportBookmarks = () => {
+    const dataStr = JSON.stringify({ bookmarks, settings }, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'bookmarks-export.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBookmarks = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target?.result as string);
+          if (data.bookmarks) {
+            setBookmarks(data.bookmarks);
+          }
+          if (data.settings) {
+            setSettings({ ...defaultSettings, ...data.settings });
+          }
+        } catch (error) {
+          alert('Invalid file format');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return settings.clockType === 'digital' 
+      ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
   };
 
   const formatDate = (date: Date) => {
@@ -217,26 +296,83 @@ function App() {
     });
   };
 
+  const getBackgroundStyle = () => {
+    switch (settings.backgroundType) {
+      case 'gradient':
+        return `bg-gradient-to-br ${settings.backgroundColor}`;
+      case 'color':
+        return '';
+      case 'image':
+        return settings.backgroundImage ? '' : `bg-gradient-to-br ${settings.backgroundColor}`;
+      default:
+        return `bg-gradient-to-br ${settings.backgroundColor}`;
+    }
+  };
+
+  const getGridColumns = () => {
+    const cols = settings.gridColumns;
+    return `grid-cols-2 sm:grid-cols-${Math.min(cols, 3)} md:grid-cols-${Math.min(cols, 4)} lg:grid-cols-${Math.min(cols, 5)} xl:grid-cols-${cols}`;
+  };
+
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
-      isDark 
-        ? 'bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900' 
-        : 'bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500'
-    }`}>
+    <div 
+      className={`min-h-screen transition-colors duration-300 ${getBackgroundStyle()}`}
+      style={settings.backgroundType === 'color' ? { backgroundColor: settings.backgroundColor } : 
+             settings.backgroundType === 'image' && settings.backgroundImage ? { 
+               backgroundImage: `url(${settings.backgroundImage})`,
+               backgroundSize: 'cover',
+               backgroundPosition: 'center',
+               backgroundRepeat: 'no-repeat'
+             } : {}}
+    >
       {/* Header */}
       <header className="p-6">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div className="text-white">
-              <h1 className="text-4xl font-bold mb-2">
-                {formatTime(currentTime)}
-              </h1>
-              <p className="text-white/80 text-lg">
-                {formatDate(currentTime)}
-              </p>
+          <div className="flex items-start justify-between mb-8">
+            <div className="flex items-start space-x-6">
+              {/* Clock Widget */}
+              {settings.showClock && (
+                <div className="text-white">
+                  {settings.clockType === 'digital' ? (
+                    <>
+                      <h1 className="text-4xl font-bold mb-2">
+                        {formatTime(currentTime)}
+                      </h1>
+                      <p className="text-white/80 text-lg">
+                        {formatDate(currentTime)}
+                      </p>
+                    </>
+                  ) : (
+                    <AnalogClock />
+                  )}
+                </div>
+              )}
+              
+              {/* Weather Widget */}
+              {settings.showWeather && (
+                <WeatherWidget />
+              )}
             </div>
+            
             <div className="flex items-center space-x-4">
-              <ThemeToggle isDark={isDark} onToggle={() => setIsDark(!isDark)} />
+              <button
+                onClick={() => setSettings({ ...settings, viewMode: settings.viewMode === 'grid' ? 'list' : 'grid' })}
+                className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-200 flex items-center justify-center text-white"
+                title={`Switch to ${settings.viewMode === 'grid' ? 'list' : 'grid'} view`}
+              >
+                {settings.viewMode === 'grid' ? <List className="w-5 h-5" /> : <Grid className="w-5 h-5" />}
+              </button>
+              <ThemeToggle 
+                isDark={settings.theme === 'dark'} 
+                onToggle={() => setSettings({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' })} 
+              />
+              <button
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-200 flex items-center justify-center text-white"
+                title="Settings"
+              >
+                <SettingsIcon className="w-5 h-5" />
+              </button>
               <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="w-12 h-12 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full hover:bg-white/20 transition-all duration-200 flex items-center justify-center text-white"
@@ -248,34 +384,85 @@ function App() {
           </div>
 
           {/* Search Bar */}
-          <SearchBar value={searchTerm} onChange={setSearchTerm} />
+          <SearchBar 
+            value={searchTerm} 
+            onChange={setSearchTerm} 
+            settings={settings}
+          />
         </div>
       </header>
 
       {/* Main Content */}
       <main className="px-6 pb-12">
         <div className="max-w-6xl mx-auto">
+          {/* Quote Widget */}
+          {!searchTerm && (
+            <div className="mb-8">
+              <QuoteWidget className="max-w-2xl mx-auto" />
+            </div>
+          )}
+          
+          {/* Pinned Bookmarks */}
+          {settings.showQuickLinks && pinnedBookmarks.length > 0 && !searchTerm && (
+            <div className="mb-8">
+              <h2 className="text-white text-lg font-semibold mb-4 flex items-center">
+                <span>Pinned</span>
+              </h2>
+              <div className={`grid ${getGridColumns()} gap-4`}>
+                {pinnedBookmarks.map((bookmark) => (
+                  <div
+                    key={bookmark.id}
+                    onDragOver={(e) => handleDragOver(e, bookmark.id)}
+                    onDrop={(e) => handleDrop(e, bookmark.id)}
+                    className={`${dragOverId === bookmark.id ? 'scale-105' : ''} transition-transform duration-200`}
+                  >
+                    <BookmarkTile
+                      item={bookmark}
+                      settings={settings}
+                      onEdit={setEditingBookmark}
+                      onDelete={handleDeleteBookmark}
+                      onToggleFavorite={handleToggleFavorite}
+                      onTogglePin={handleTogglePin}
+                      onOpenFolder={handleOpenFolder}
+                      isDragging={draggedItemId === bookmark.id}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* All Bookmarks */}
           {displayBookmarks.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {displayBookmarks.map((bookmark) => (
-                <div
-                  key={bookmark.id}
-                  onDragOver={(e) => handleDragOver(e, bookmark.id)}
-                  onDrop={(e) => handleDrop(e, bookmark.id)}
-                  className={`${dragOverId === bookmark.id ? 'scale-105' : ''} transition-transform duration-200`}
-                >
-                  <BookmarkTile
-                    item={bookmark}
-                    onEdit={setEditingBookmark}
-                    onDelete={handleDeleteBookmark}
-                    onToggleFavorite={handleToggleFavorite}
-                    onOpenFolder={handleOpenFolder}
-                    isDragging={draggedItemId === bookmark.id}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  />
-                </div>
-              ))}
+            <div>
+              {(settings.showQuickLinks && pinnedBookmarks.length > 0 && !searchTerm) && (
+                <h2 className="text-white text-lg font-semibold mb-4">All Bookmarks</h2>
+              )}
+              <div className={settings.viewMode === 'grid' ? `grid ${getGridColumns()} gap-4` : 'space-y-2'}>
+                {(searchTerm ? displayBookmarks : regularBookmarks).map((bookmark) => (
+                  <div
+                    key={bookmark.id}
+                    onDragOver={(e) => handleDragOver(e, bookmark.id)}
+                    onDrop={(e) => handleDrop(e, bookmark.id)}
+                    className={`${dragOverId === bookmark.id ? 'scale-105' : ''} transition-transform duration-200`}
+                  >
+                    <BookmarkTile
+                      item={bookmark}
+                      settings={settings}
+                      onEdit={setEditingBookmark}
+                      onDelete={handleDeleteBookmark}
+                      onToggleFavorite={handleToggleFavorite}
+                      onTogglePin={handleTogglePin}
+                      onOpenFolder={handleOpenFolder}
+                      isDragging={draggedItemId === bookmark.id}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="text-center py-16">
@@ -292,7 +479,7 @@ function App() {
                 }
               </p>
               {!searchTerm && (
-                <button
+                <div
                   onClick={() => setIsAddModalOpen(true)}
                   className="px-6 py-3 bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors font-medium"
                 >
@@ -305,6 +492,16 @@ function App() {
       </main>
 
       {/* Modals */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        settings={settings}
+        onUpdateSettings={setSettings}
+        onResetSettings={handleResetSettings}
+        onExportBookmarks={handleExportBookmarks}
+        onImportBookmarks={handleImportBookmarks}
+      />
+
       <AddBookmarkModal
         isOpen={isAddModalOpen}
         onClose={() => {
@@ -334,6 +531,7 @@ function App() {
         onEditBookmark={setEditingBookmark}
         onDeleteBookmark={handleDeleteBookmark}
         onToggleFavorite={handleToggleFavorite}
+        onTogglePin={handleTogglePin}
         onAddBookmark={() => {
           setEditingBookmark({
             id: '',

@@ -9,6 +9,7 @@ interface FolderModalProps {
   onEditBookmark: (bookmark: any) => void;
   onDeleteBookmark: (id: string) => void;
   onToggleFavorite: (id: string) => void;
+  onTogglePin: (id: string) => void;
   onAddBookmark: () => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onDragEnd: () => void;
@@ -22,6 +23,7 @@ export const FolderModal: React.FC<FolderModalProps> = ({
   onEditBookmark,
   onDeleteBookmark,
   onToggleFavorite,
+  onTogglePin,
   onAddBookmark,
   onDragStart,
   onDragEnd,
@@ -62,7 +64,9 @@ export const FolderModal: React.FC<FolderModalProps> = ({
                   onEdit={onEditBookmark}
                   onDelete={onDeleteBookmark}
                   onToggleFavorite={onToggleFavorite}
+                  onTogglePin={onTogglePin}
                   onOpenFolder={() => {}}
+                  settings={{ tileSize: 'medium', viewMode: 'grid' } as any}
                   isDragging={draggedItemId === item.id}
                   onDragStart={onDragStart}
                   onDragEnd={onDragEnd}

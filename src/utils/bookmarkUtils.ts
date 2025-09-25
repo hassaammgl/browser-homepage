@@ -1,12 +1,4 @@
-export interface Bookmark {
-  id: string;
-  title: string;
-  url?: string;
-  type: 'bookmark' | 'folder';
-  items?: Bookmark[];
-  isFavorite?: boolean;
-  folderId?: string;
-}
+import { Bookmark } from '../types';
 
 export function searchBookmarks(bookmarks: Bookmark[], searchTerm: string): Bookmark[] {
   if (!searchTerm.trim()) return bookmarks;
