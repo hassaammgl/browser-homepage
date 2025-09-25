@@ -479,7 +479,7 @@ function App() {
                 }
               </p>
               {!searchTerm && (
-                <div
+                <button
                   onClick={() => setIsAddModalOpen(true)}
                   className="px-6 py-3 bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors font-medium"
                 >

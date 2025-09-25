@@ -119,7 +119,7 @@ export const BookmarkTile: React.FC<BookmarkTileProps> = ({
   if (settings.viewMode === 'list') {
     return (
       <div
-        className={`group relative bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${
+        className={`group relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${
           isDragging ? 'opacity-50' : ''
         } ${item.isFavorite ? 'ring-2 ring-yellow-400' : ''} ${item.isPinned ? 'ring-2 ring-blue-400' : ''}`}
         draggable
@@ -178,7 +178,7 @@ export const BookmarkTile: React.FC<BookmarkTileProps> = ({
 
   return (
     <div
-      className={`group relative bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 ${
+      className={`group relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${item.isFavorite ? 'ring-2 ring-yellow-400' : ''} ${item.isPinned ? 'ring-2 ring-blue-400' : ''}`}
       draggable
